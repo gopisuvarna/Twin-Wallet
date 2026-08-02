@@ -38,7 +38,7 @@ export const AnalyticsScreen = () => {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>Financial Analytics</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Joint & individual category breakdown</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Individual partner category breakdown</Text>
 
       {/* Month Picker Header */}
       <MonthHeader onMonthChanged={fetchAnalytics} />
@@ -58,32 +58,6 @@ export const AnalyticsScreen = () => {
               <Text style={[styles.cardLabel, { color: colors.textMuted }]}>Average Expense</Text>
               <Text style={[styles.cardValue, { color: colors.primary }]}>{formatINR(analytics.average_expense)}</Text>
             </View>
-          </View>
-
-          {/* Joint Category Breakdown */}
-          <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>👥 Joint Category Breakdown</Text>
-
-            {analytics.category_breakdown?.length === 0 ? (
-              <Text style={{ color: colors.textMuted }}>No joint expenses logged for this month.</Text>
-            ) : (
-              analytics.category_breakdown?.map((cat: any, idx: number) => {
-                const barColor = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
-                return (
-                  <View key={cat.category} style={styles.catRow}>
-                    <View style={styles.catHeader}>
-                      <Text style={[styles.catName, { color: colors.textPrimary }]}>{cat.category}</Text>
-                      <Text style={[styles.catAmt, { color: colors.textSecondary }]}>
-                        {formatINR(cat.amount)} ({cat.percentage}%)
-                      </Text>
-                    </View>
-                    <View style={[styles.progressBg, { backgroundColor: colors.surfaceVariant }]}>
-                      <View style={[styles.progressFill, { width: `${cat.percentage}%`, backgroundColor: barColor }]} />
-                    </View>
-                  </View>
-                );
-              })
-            )}
           </View>
 
           {/* Individual Person Category Breakdown Charts for Partner 1 & Partner 2 */}

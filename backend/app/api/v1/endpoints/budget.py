@@ -59,8 +59,12 @@ async def create_or_update_budget(
         Budget.wallet_id == wallet.id,
         Budget.year == budget_in.year,
         Budget.month == budget_in.month,
-        Budget.category == budget_in.category,
     ]
+    if budget_in.category:
+        conditions.append(Budget.category == budget_in.category)
+    else:
+        conditions.append(Budget.category.is_(None))
+
     if budget_in.user_id:
         conditions.append(Budget.user_id == budget_in.user_id)
     else:

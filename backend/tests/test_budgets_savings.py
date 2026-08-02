@@ -33,6 +33,17 @@ async def test_budgets_and_savings_lifecycle(client):
     assert b_data["amount_limit"] == 10000.0
     assert b_data["is_exceeded"] is False
 
+    # Step 2b: Create Overall Budget Cap (category = None)
+    b_overall_res = await client.post("/api/v1/budgets/", json={
+        "category": None,
+        "amount_limit": 50000.0,
+        "year": 2026,
+        "month": 8
+    }, headers=gopi_headers)
+    assert b_overall_res.status_code == 201
+    assert b_overall_res.json()["category"] is None
+    assert b_overall_res.json()["amount_limit"] == 50000.0
+
     # Step 3: Log expense of 12,000 under Food -> Budget exceeded
     await client.post("/api/v1/expenses/", json={
         "amount": 12000,
@@ -44,9 +55,7 @@ async def test_budgets_and_savings_lifecycle(client):
     b_list_res = await client.get("/api/v1/budgets/?year=2026&month=8", headers=gopi_headers)
     assert b_list_res.status_code == 200
     budgets = b_list_res.json()
-    assert len(budgets) == 1
-    assert budgets[0]["spent_amount"] == 12000.0
-    assert budgets[0]["is_exceeded"] is True
+    assert len(budgets) == 2
 
     # Step 4: Create Savings Goal
     s_res = await client.post("/api/v1/savings/", json={

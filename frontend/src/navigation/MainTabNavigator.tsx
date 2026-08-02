@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, PanResponder } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, PanResponder, BackHandler } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { darkColors, lightColors } from '../theme/colors';
@@ -19,6 +19,20 @@ export const MainTabNavigator = () => {
   const isDarkMode = useSelector((state: RootState) => state.theme.isDarkMode);
   const colors = isDarkMode ? darkColors : lightColors;
 
+  // Intercept Android hardware Back button: return to Home tab instead of exiting the app
+  useEffect(() => {
+    const onBackPress = () => {
+      if (currentTab !== 'dashboard') {
+        setCurrentTab('dashboard');
+        return true; // Prevents default app exit
+      }
+      return false; // Allows app exit if already on Home dashboard
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [currentTab]);
+
   const handleNavigate = (screen: string) => {
     const s = screen.toLowerCase();
     if (s.includes('add')) setCurrentTab('add');
@@ -34,7 +48,6 @@ export const MainTabNavigator = () => {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Trigger swipe if on a non-dashboard screen and horizontal gesture > 60px
         return (
           currentTab !== 'dashboard' &&
           Math.abs(gestureState.dx) > 60 &&
