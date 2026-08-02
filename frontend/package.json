@@ -1,0 +1,27 @@
+{
+  "name": "twinwallet-frontend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "npx expo start --clear",
+    "android": "npx expo start --android",
+    "ios": "npx expo start --ios"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.2.1",
+    "axios": "^1.6.8",
+    "babel-preset-expo": "~54.0.10",
+    "expo": "~54.0.36",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-hook-form": "^7.51.0",
+    "react-native": "0.81.5",
+    "react-redux": "^9.1.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.1.10",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
