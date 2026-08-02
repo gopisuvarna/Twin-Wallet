@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, PanResponder } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { darkColors, lightColors } from '../theme/colors';
@@ -30,6 +30,25 @@ export const MainTabNavigator = () => {
     else setCurrentTab('dashboard');
   };
 
+  // Swipe / slide gesture to return to Home dashboard from any secondary tab
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Trigger swipe if on a non-dashboard screen and horizontal gesture > 60px
+        return (
+          currentTab !== 'dashboard' &&
+          Math.abs(gestureState.dx) > 60 &&
+          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.8
+        );
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (Math.abs(gestureState.dx) > 60) {
+          setCurrentTab('dashboard');
+        }
+      },
+    })
+  ).current;
+
   const renderScreen = () => {
     switch (currentTab) {
       case 'dashboard':
@@ -53,7 +72,9 @@ export const MainTabNavigator = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.screenContainer}>{renderScreen()}</View>
+      <View style={styles.screenContainer} {...panResponder.panHandlers}>
+        {renderScreen()}
+      </View>
 
       {/* Bottom Navigation Bar */}
       <View style={[styles.tabBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>

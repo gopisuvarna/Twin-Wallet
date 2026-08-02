@@ -13,6 +13,7 @@ export const AddTransactionScreen = ({ navigation }: any) => {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [source, setSource] = useState(INCOME_SOURCES[0]);
+  const [customName, setCustomName] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -26,19 +27,22 @@ export const AddTransactionScreen = ({ navigation }: any) => {
       return;
     }
 
+    const finalCategory = (category === 'Others' && customName.trim()) ? customName.trim() : category;
+    const finalSource = (source === 'Other' && customName.trim()) ? customName.trim() : source;
+
     setIsSubmitting(true);
     try {
       if (txType === 'income') {
         await transactionApi.createIncome({
           amount: numericAmount,
-          source,
+          source: finalSource,
           description,
           transaction_date: new Date().toISOString().split('T')[0],
         });
       } else {
         await transactionApi.createExpense({
           amount: numericAmount,
-          category,
+          category: finalCategory,
           description,
           transaction_date: new Date().toISOString().split('T')[0],
         });
@@ -51,6 +55,8 @@ export const AddTransactionScreen = ({ navigation }: any) => {
       setIsSubmitting(false);
     }
   };
+
+  const isOtherSelected = txType === 'income' ? source === 'Other' : category === 'Others';
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -118,6 +124,22 @@ export const AddTransactionScreen = ({ navigation }: any) => {
           );
         })}
       </View>
+
+      {/* Custom Category/Source Name Box if Others/Other is selected */}
+      {isOtherSelected ? (
+        <View style={{ marginTop: 12 }}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>
+            Custom {txType === 'income' ? 'Source' : 'Category'} Name
+          </Text>
+          <TextInput
+            value={customName}
+            onChangeText={setCustomName}
+            placeholder={`Enter custom ${txType === 'income' ? 'source' : 'category'} name...`}
+            placeholderTextColor={colors.textMuted}
+            style={[styles.input, { backgroundColor: colors.surface, color: colors.textPrimary, borderColor: colors.border }]}
+          />
+        </View>
+      ) : null}
 
       {/* Description Input */}
       <Text style={[styles.label, { color: colors.textSecondary }]}>Description (Optional)</Text>

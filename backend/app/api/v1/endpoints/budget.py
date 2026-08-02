@@ -14,7 +14,6 @@ router = APIRouter()
 
 
 async def _build_budget_response(b: Budget, wallet_id: str, db: AsyncSession) -> BudgetResponse:
-    # Calculate spent amount based on category and user scope (Combined vs Individual)
     e_stmt = select(func.coalesce(func.sum(Expense.amount), 0.0)).where(
         and_(
             Expense.wallet_id == wallet_id,
@@ -56,15 +55,18 @@ async def create_or_update_budget(
     wallet: Wallet = Depends(get_shared_wallet),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Budget).options(joinedload(Budget.user)).where(
-        and_(
-            Budget.wallet_id == wallet.id,
-            Budget.year == budget_in.year,
-            Budget.month == budget_in.month,
-            Budget.category == budget_in.category,
-            Budget.user_id == budget_in.user_id
-        )
-    )
+    conditions = [
+        Budget.wallet_id == wallet.id,
+        Budget.year == budget_in.year,
+        Budget.month == budget_in.month,
+        Budget.category == budget_in.category,
+    ]
+    if budget_in.user_id:
+        conditions.append(Budget.user_id == budget_in.user_id)
+    else:
+        conditions.append(Budget.user_id.is_(None))
+
+    stmt = select(Budget).options(joinedload(Budget.user)).where(and_(*conditions))
     existing = (await db.execute(stmt)).scalar_one_or_none()
 
     if existing:
@@ -84,7 +86,6 @@ async def create_or_update_budget(
     await db.commit()
     await db.refresh(budget_obj)
 
-    # Reload with user relationship
     stmt_reload = select(Budget).options(joinedload(Budget.user)).where(Budget.id == budget_obj.id)
     budget_obj = (await db.execute(stmt_reload)).scalar_one()
 
@@ -140,7 +141,6 @@ async def update_budget(
     await db.commit()
     await db.refresh(budget_obj)
 
-    # Reload with user relationship
     stmt_reload = select(Budget).options(joinedload(Budget.user)).where(Budget.id == budget_obj.id)
     budget_obj = (await db.execute(stmt_reload)).scalar_one()
 

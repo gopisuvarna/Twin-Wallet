@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { analyticsApi } from '../../api/analyticsApi';
-import { reportApi } from '../../api/reportApi';
 import { MonthHeader } from '../../components/common/MonthHeader';
 import { formatINR } from '../../utils/currency';
-import { downloadAndOpenFile } from '../../utils/fileDownloader';
 import { darkColors, lightColors } from '../../theme/colors';
+
+const CATEGORY_COLORS = [
+  '#6366F1', '#EC4899', '#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EF4444', '#14B8A6'
+];
 
 export const AnalyticsScreen = () => {
   const { selectedYear, selectedMonth } = useSelector((state: RootState) => state.wallet);
@@ -16,8 +18,6 @@ export const AnalyticsScreen = () => {
 
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [exportingPdf, setExportingPdf] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
 
   const fetchAnalytics = async () => {
     setLoading(true);
@@ -35,36 +35,10 @@ export const AnalyticsScreen = () => {
     fetchAnalytics();
   }, [selectedYear, selectedMonth]);
 
-  const handleExportPdf = async () => {
-    setExportingPdf(true);
-    try {
-      const res = await reportApi.exportPdf(selectedYear, selectedMonth);
-      const filename = `TwinWallet_Statement_${selectedYear}_${selectedMonth}.pdf`;
-      downloadAndOpenFile(res.data, filename, 'application/pdf');
-    } catch (err: any) {
-      Alert.alert('Export Failed', err?.message || 'Failed to generate PDF report.');
-    } finally {
-      setExportingPdf(false);
-    }
-  };
-
-  const handleExportCsv = async () => {
-    setExportingCsv(true);
-    try {
-      const res = await reportApi.exportCsv(selectedYear, selectedMonth);
-      const filename = `TwinWallet_Ledger_${selectedYear}_${selectedMonth}.csv`;
-      downloadAndOpenFile(res.data, filename, 'text/csv');
-    } catch (err: any) {
-      Alert.alert('Export Failed', err?.message || 'Failed to export CSV ledger.');
-    } finally {
-      setExportingCsv(false);
-    }
-  };
-
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>Financial Analytics</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>In-depth spending & savings insights</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Joint & individual category breakdown</Text>
 
       {/* Month Picker Header */}
       <MonthHeader onMonthChanged={fetchAnalytics} />
@@ -86,64 +60,68 @@ export const AnalyticsScreen = () => {
             </View>
           </View>
 
-          {/* Category Breakdown */}
+          {/* Joint Category Breakdown */}
           <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Category Breakdown</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>👥 Joint Category Breakdown</Text>
 
-            {analytics.top_category ? (
-              <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>
-                Top Spending: <Text style={{ color: colors.expense, fontWeight: '700' }}>{analytics.top_category}</Text>
-              </Text>
-            ) : null}
+            {analytics.category_breakdown?.length === 0 ? (
+              <Text style={{ color: colors.textMuted }}>No joint expenses logged for this month.</Text>
+            ) : (
+              analytics.category_breakdown?.map((cat: any, idx: number) => {
+                const barColor = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+                return (
+                  <View key={cat.category} style={styles.catRow}>
+                    <View style={styles.catHeader}>
+                      <Text style={[styles.catName, { color: colors.textPrimary }]}>{cat.category}</Text>
+                      <Text style={[styles.catAmt, { color: colors.textSecondary }]}>
+                        {formatINR(cat.amount)} ({cat.percentage}%)
+                      </Text>
+                    </View>
+                    <View style={[styles.progressBg, { backgroundColor: colors.surfaceVariant }]}>
+                      <View style={[styles.progressFill, { width: `${cat.percentage}%`, backgroundColor: barColor }]} />
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
 
-            {analytics.category_breakdown?.map((cat: any) => (
-              <View key={cat.category} style={styles.catRow}>
-                <View style={styles.catHeader}>
-                  <Text style={[styles.catName, { color: colors.textPrimary }]}>{cat.category}</Text>
-                  <Text style={[styles.catAmt, { color: colors.textSecondary }]}>
-                    {formatINR(cat.amount)} ({cat.percentage}%)
-                  </Text>
-                </View>
-                <View style={[styles.progressBg, { backgroundColor: colors.surfaceVariant }]}>
-                  <View style={[styles.progressFill, { width: `${cat.percentage}%`, backgroundColor: colors.primary }]} />
-                </View>
+          {/* Individual Person Category Breakdown Charts for Partner 1 & Partner 2 */}
+          {analytics.partner_analytics?.map((partner: any) => (
+            <View key={partner.user_id} style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.partnerHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.textPrimary, marginBottom: 0 }]}>
+                  👤 {partner.user_name}'s Spending
+                </Text>
+                <Text style={[styles.partnerTotalExp, { color: colors.expense }]}>
+                  Total: {formatINR(partner.expense)}
+                </Text>
               </View>
-            ))}
-          </View>
 
-          {/* Export Statements */}
-          <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Export Reports & Statements</Text>
-            <Text style={[styles.cardLabel, { color: colors.textSecondary, marginBottom: 14 }]}>
-              Generate official PDF summary or raw CSV data.
-            </Text>
-
-            <View style={styles.btnRow}>
-              <TouchableOpacity
-                onPress={handleExportPdf}
-                disabled={exportingPdf}
-                style={[styles.exportBtn, { backgroundColor: colors.primary }]}
-              >
-                {exportingPdf ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={styles.exportBtnText}>📄 PDF Report</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleExportCsv}
-                disabled={exportingCsv}
-                style={[styles.exportBtn, { backgroundColor: colors.surfaceVariant, borderWidth: 1, borderColor: colors.border }]}
-              >
-                {exportingCsv ? (
-                  <ActivityIndicator color={colors.textPrimary} />
-                ) : (
-                  <Text style={[styles.exportBtnText, { color: colors.textPrimary }]}>📊 CSV Export</Text>
-                )}
-              </TouchableOpacity>
+              {!partner.category_breakdown || partner.category_breakdown.length === 0 ? (
+                <Text style={{ color: colors.textMuted, marginTop: 8 }}>No individual expenses logged for this month.</Text>
+              ) : (
+                <View style={{ marginTop: 12 }}>
+                  {partner.category_breakdown.map((cat: any, idx: number) => {
+                    const barColor = CATEGORY_COLORS[(idx + 2) % CATEGORY_COLORS.length];
+                    return (
+                      <View key={cat.category} style={styles.catRow}>
+                        <View style={styles.catHeader}>
+                          <Text style={[styles.catName, { color: colors.textPrimary }]}>{cat.category}</Text>
+                          <Text style={[styles.catAmt, { color: colors.textSecondary }]}>
+                            {formatINR(cat.amount)} ({cat.percentage}%)
+                          </Text>
+                        </View>
+                        <View style={[styles.progressBg, { backgroundColor: colors.surfaceVariant }]}>
+                          <View style={[styles.progressFill, { width: `${cat.percentage}%`, backgroundColor: barColor }]} />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
             </View>
-          </View>
+          ))}
         </>
       ) : null}
 
@@ -195,8 +173,17 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
     marginBottom: 10,
+  },
+  partnerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  partnerTotalExp: {
+    fontSize: 13,
+    fontWeight: '800',
   },
   catRow: {
     marginBottom: 12,
@@ -214,28 +201,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   progressBg: {
-    height: 6,
-    borderRadius: 3,
+    height: 7,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  exportBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  exportBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFF',
+    borderRadius: 4,
   },
 });
