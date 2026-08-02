@@ -1,15 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { formatINR } from '../../utils/currency';
 import { darkColors, lightColors } from '../../theme/colors';
 
 interface SavingsGoalCardProps {
+  id: string;
   goalName: string;
   targetAmount: number;
   currentProgress: number;
   completionPercentage: number;
   targetDate?: string | null;
   isCompleted: boolean;
+  onDelete?: () => void;
   isDarkMode?: boolean;
 }
 
@@ -20,9 +22,21 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
   completionPercentage,
   targetDate,
   isCompleted,
+  onDelete,
   isDarkMode = true,
 }) => {
   const colors = isDarkMode ? darkColors : lightColors;
+
+  const handleDeletePress = () => {
+    Alert.alert(
+      'Delete Goal',
+      `Are you sure you want to delete savings goal "${goalName}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: onDelete },
+      ]
+    );
+  };
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -64,6 +78,12 @@ export const SavingsGoalCard: React.FC<SavingsGoalCardProps> = ({
         <Text style={[styles.pctText, { color: colors.textMuted }]}>
           {completionPercentage.toFixed(1)}% Achieved
         </Text>
+
+        {onDelete ? (
+          <TouchableOpacity onPress={handleDeletePress} style={styles.deleteBtn}>
+            <Text style={styles.deleteIcon}>🗑️ Delete Goal</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );
@@ -115,11 +135,20 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 6,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
   },
   pctText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  deleteBtn: {
+    paddingVertical: 2,
+  },
+  deleteIcon: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EF4444',
   },
 });

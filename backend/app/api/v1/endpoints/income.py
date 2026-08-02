@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user, get_shared_wallet
 from app.models import Income, User, Wallet
-from app.schemas.transaction import IncomeCreate, IncomeResponse
+from app.schemas.transaction import IncomeCreate, IncomeUpdate, IncomeResponse
 
 router = APIRouter()
 
@@ -31,7 +31,6 @@ async def create_income(
     await db.commit()
     await db.refresh(income)
 
-    # Load relationship for response
     stmt = select(Income).options(joinedload(Income.user)).where(Income.id == income.id)
     res = await db.execute(stmt)
     return res.scalar_one()
@@ -58,6 +57,37 @@ async def list_incomes(
     stmt = stmt.order_by(Income.transaction_date.desc(), Income.created_at.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.put("/{income_id}", response_model=IncomeResponse)
+async def update_income(
+    income_id: str,
+    income_in: IncomeUpdate,
+    current_user: User = Depends(get_current_user),
+    wallet: Wallet = Depends(get_shared_wallet),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(Income).options(joinedload(Income.user)).where(
+        and_(Income.id == income_id, Income.wallet_id == wallet.id)
+    )
+    income = (await db.execute(stmt)).scalar_one_or_none()
+    if not income:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Income transaction not found.")
+
+    if income_in.amount is not None:
+        income.amount = income_in.amount
+    if income_in.source is not None:
+        income.source = income_in.source.value
+    if income_in.description is not None:
+        income.description = income_in.description
+    if income_in.transaction_date is not None:
+        income.transaction_date = income_in.transaction_date
+
+    await db.commit()
+    await db.refresh(income)
+
+    stmt_reload = select(Income).options(joinedload(Income.user)).where(Income.id == income.id)
+    return (await db.execute(stmt_reload)).scalar_one()
 
 
 @router.delete("/{income_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,15 +1,52 @@
 from typing import List, Optional
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user, get_shared_wallet
-from app.models import Budget, User, Wallet
-from app.schemas.budget import BudgetCreate, BudgetResponse
+from app.models import Budget, User, Wallet, Expense
+from app.schemas.budget import BudgetCreate, BudgetUpdate, BudgetResponse
 from app.services.calculation_service import CalculationService
 
 router = APIRouter()
+
+
+async def _build_budget_response(b: Budget, wallet_id: str, db: AsyncSession) -> BudgetResponse:
+    # Calculate spent amount based on category and user scope (Combined vs Individual)
+    e_stmt = select(func.coalesce(func.sum(Expense.amount), 0.0)).where(
+        and_(
+            Expense.wallet_id == wallet_id,
+            func.extract("year", Expense.transaction_date) == b.year,
+            func.extract("month", Expense.transaction_date) == b.month
+        )
+    )
+    if b.category:
+        e_stmt = e_stmt.where(Expense.category == b.category)
+    if b.user_id:
+        e_stmt = e_stmt.where(Expense.user_id == b.user_id)
+
+    spent = float((await db.execute(e_stmt)).scalar() or 0.0)
+    remaining = float(b.amount_limit) - spent
+    pct = (spent / float(b.amount_limit) * 100) if float(b.amount_limit) > 0 else 0.0
+
+    user_name = b.user.full_name if b.user else None
+
+    return BudgetResponse(
+        id=b.id,
+        wallet_id=b.wallet_id,
+        user_id=b.user_id,
+        user_name=user_name,
+        category=b.category,
+        amount_limit=float(b.amount_limit),
+        spent_amount=spent,
+        remaining_amount=remaining,
+        percentage_used=round(pct, 2),
+        is_exceeded=spent > float(b.amount_limit),
+        year=b.year,
+        month=b.month
+    )
 
 
 @router.post("/", response_model=BudgetResponse, status_code=status.HTTP_201_CREATED)
@@ -19,12 +56,13 @@ async def create_or_update_budget(
     wallet: Wallet = Depends(get_shared_wallet),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Budget).where(
+    stmt = select(Budget).options(joinedload(Budget.user)).where(
         and_(
             Budget.wallet_id == wallet.id,
             Budget.year == budget_in.year,
             Budget.month == budget_in.month,
-            Budget.category == budget_in.category
+            Budget.category == budget_in.category,
+            Budget.user_id == budget_in.user_id
         )
     )
     existing = (await db.execute(stmt)).scalar_one_or_none()
@@ -35,6 +73,7 @@ async def create_or_update_budget(
     else:
         budget_obj = Budget(
             wallet_id=wallet.id,
+            user_id=budget_in.user_id,
             category=budget_in.category,
             amount_limit=budget_in.amount_limit,
             year=budget_in.year,
@@ -45,39 +84,11 @@ async def create_or_update_budget(
     await db.commit()
     await db.refresh(budget_obj)
 
-    # Calculate current spent amount dynamically
-    if budget_obj.category:
-        # Category specific spent amount
-        from app.models import Expense
-        from sqlalchemy import func
-        e_stmt = select(func.coalesce(func.sum(Expense.amount), 0.0)).where(
-            and_(
-                Expense.wallet_id == wallet.id,
-                Expense.category == budget_obj.category,
-                func.extract("year", Expense.transaction_date) == budget_obj.year,
-                func.extract("month", Expense.transaction_date) == budget_obj.month
-            )
-        )
-        spent = float((await db.execute(e_stmt)).scalar() or 0.0)
-    else:
-        # Overall spent amount
-        spent = await CalculationService.get_total_expense(db, wallet.id, budget_obj.year, budget_obj.month)
+    # Reload with user relationship
+    stmt_reload = select(Budget).options(joinedload(Budget.user)).where(Budget.id == budget_obj.id)
+    budget_obj = (await db.execute(stmt_reload)).scalar_one()
 
-    remaining = float(budget_obj.amount_limit) - spent
-    pct = (spent / float(budget_obj.amount_limit) * 100) if float(budget_obj.amount_limit) > 0 else 0.0
-
-    return BudgetResponse(
-        id=budget_obj.id,
-        wallet_id=budget_obj.wallet_id,
-        category=budget_obj.category,
-        amount_limit=float(budget_obj.amount_limit),
-        spent_amount=spent,
-        remaining_amount=remaining,
-        percentage_used=round(pct, 2),
-        is_exceeded=spent > float(budget_obj.amount_limit),
-        year=budget_obj.year,
-        month=budget_obj.month
-    )
+    return await _build_budget_response(budget_obj, wallet.id, db)
 
 
 @router.get("/", response_model=List[BudgetResponse])
@@ -88,7 +99,7 @@ async def list_budgets(
     wallet: Wallet = Depends(get_shared_wallet),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(Budget).where(
+    stmt = select(Budget).options(joinedload(Budget.user)).where(
         and_(
             Budget.wallet_id == wallet.id,
             Budget.year == year,
@@ -99,35 +110,54 @@ async def list_budgets(
 
     res = []
     for b in budgets:
-        if b.category:
-            from app.models import Expense
-            from sqlalchemy import func
-            e_stmt = select(func.coalesce(func.sum(Expense.amount), 0.0)).where(
-                and_(
-                    Expense.wallet_id == wallet.id,
-                    Expense.category == b.category,
-                    func.extract("year", Expense.transaction_date) == year,
-                    func.extract("month", Expense.transaction_date) == month
-                )
-            )
-            spent = float((await db.execute(e_stmt)).scalar() or 0.0)
-        else:
-            spent = await CalculationService.get_total_expense(db, wallet.id, year, month)
-
-        remaining = float(b.amount_limit) - spent
-        pct = (spent / float(b.amount_limit) * 100) if float(b.amount_limit) > 0 else 0.0
-
-        res.append(BudgetResponse(
-            id=b.id,
-            wallet_id=b.wallet_id,
-            category=b.category,
-            amount_limit=float(b.amount_limit),
-            spent_amount=spent,
-            remaining_amount=remaining,
-            percentage_used=round(pct, 2),
-            is_exceeded=spent > float(b.amount_limit),
-            year=b.year,
-            month=b.month
-        ))
+        res.append(await _build_budget_response(b, wallet.id, db))
 
     return res
+
+
+@router.put("/{budget_id}", response_model=BudgetResponse)
+async def update_budget(
+    budget_id: str,
+    budget_in: BudgetUpdate,
+    current_user: User = Depends(get_current_user),
+    wallet: Wallet = Depends(get_shared_wallet),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(Budget).options(joinedload(Budget.user)).where(
+        and_(Budget.id == budget_id, Budget.wallet_id == wallet.id)
+    )
+    budget_obj = (await db.execute(stmt)).scalar_one_or_none()
+    if not budget_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found.")
+
+    if budget_in.amount_limit is not None:
+        budget_obj.amount_limit = budget_in.amount_limit
+    if budget_in.category is not None:
+        budget_obj.category = budget_in.category
+    if "user_id" in budget_in.model_fields_set:
+        budget_obj.user_id = budget_in.user_id
+
+    await db.commit()
+    await db.refresh(budget_obj)
+
+    # Reload with user relationship
+    stmt_reload = select(Budget).options(joinedload(Budget.user)).where(Budget.id == budget_obj.id)
+    budget_obj = (await db.execute(stmt_reload)).scalar_one()
+
+    return await _build_budget_response(budget_obj, wallet.id, db)
+
+
+@router.delete("/{budget_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_budget(
+    budget_id: str,
+    current_user: User = Depends(get_current_user),
+    wallet: Wallet = Depends(get_shared_wallet),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(Budget).where(and_(Budget.id == budget_id, Budget.wallet_id == wallet.id))
+    budget_obj = (await db.execute(stmt)).scalar_one_or_none()
+    if not budget_obj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found.")
+
+    await db.delete(budget_obj)
+    await db.commit()

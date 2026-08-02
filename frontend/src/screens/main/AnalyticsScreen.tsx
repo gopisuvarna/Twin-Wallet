@@ -6,6 +6,7 @@ import { analyticsApi } from '../../api/analyticsApi';
 import { reportApi } from '../../api/reportApi';
 import { MonthHeader } from '../../components/common/MonthHeader';
 import { formatINR } from '../../utils/currency';
+import { downloadAndOpenFile } from '../../utils/fileDownloader';
 import { darkColors, lightColors } from '../../theme/colors';
 
 export const AnalyticsScreen = () => {
@@ -38,12 +39,8 @@ export const AnalyticsScreen = () => {
     setExportingPdf(true);
     try {
       const res = await reportApi.exportPdf(selectedYear, selectedMonth);
-      if (res.data) {
-        Alert.alert(
-          'PDF Report Ready',
-          `Monthly PDF financial statement for ${selectedMonth}/${selectedYear} generated successfully!`
-        );
-      }
+      const filename = `TwinWallet_Statement_${selectedYear}_${selectedMonth}.pdf`;
+      downloadAndOpenFile(res.data, filename, 'application/pdf');
     } catch (err: any) {
       Alert.alert('Export Failed', err?.message || 'Failed to generate PDF report.');
     } finally {
@@ -55,12 +52,8 @@ export const AnalyticsScreen = () => {
     setExportingCsv(true);
     try {
       const res = await reportApi.exportCsv(selectedYear, selectedMonth);
-      if (res.data) {
-        Alert.alert(
-          'CSV Ledger Exported',
-          `Raw transaction ledger CSV data for ${selectedMonth}/${selectedYear} exported successfully!`
-        );
-      }
+      const filename = `TwinWallet_Ledger_${selectedYear}_${selectedMonth}.csv`;
+      downloadAndOpenFile(res.data, filename, 'text/csv');
     } catch (err: any) {
       Alert.alert('Export Failed', err?.message || 'Failed to export CSV ledger.');
     } finally {

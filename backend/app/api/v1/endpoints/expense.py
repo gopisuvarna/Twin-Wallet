@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user, get_shared_wallet
 from app.models import Expense, User, Wallet
-from app.schemas.transaction import ExpenseCreate, ExpenseResponse
+from app.schemas.transaction import ExpenseCreate, ExpenseUpdate, ExpenseResponse
 
 router = APIRouter()
 
@@ -59,6 +59,37 @@ async def list_expenses(
     stmt = stmt.order_by(Expense.transaction_date.desc(), Expense.created_at.desc())
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.put("/{expense_id}", response_model=ExpenseResponse)
+async def update_expense(
+    expense_id: str,
+    expense_in: ExpenseUpdate,
+    current_user: User = Depends(get_current_user),
+    wallet: Wallet = Depends(get_shared_wallet),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(Expense).options(joinedload(Expense.user)).where(
+        and_(Expense.id == expense_id, Expense.wallet_id == wallet.id)
+    )
+    expense = (await db.execute(stmt)).scalar_one_or_none()
+    if not expense:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense transaction not found.")
+
+    if expense_in.amount is not None:
+        expense.amount = expense_in.amount
+    if expense_in.category is not None:
+        expense.category = expense_in.category.value
+    if expense_in.description is not None:
+        expense.description = expense_in.description
+    if expense_in.transaction_date is not None:
+        expense.transaction_date = expense_in.transaction_date
+
+    await db.commit()
+    await db.refresh(expense)
+
+    stmt_reload = select(Expense).options(joinedload(Expense.user)).where(Expense.id == expense.id)
+    return (await db.execute(stmt_reload)).scalar_one()
 
 
 @router.delete("/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)

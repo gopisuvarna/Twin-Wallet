@@ -1,9 +1,10 @@
 {
   "expo": {
     "name": "TwinWallet",
-    "slug": "twinwallet",
+    "slug": "twin-wallet",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "backgroundColor": "#0F172A"
@@ -16,9 +17,16 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"
       },
       "package": "com.twinwallet.app"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0ae8070c-d2fd-44bc-9b77-e0d21258df69"
+      }
+    },
+    "owner": "suvvis-team"
   }
 }

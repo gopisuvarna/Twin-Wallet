@@ -42,6 +42,13 @@ class IncomeCreate(BaseModel):
     transaction_date: date = Field(default_factory=date.today)
 
 
+class IncomeUpdate(BaseModel):
+    amount: Optional[float] = Field(None, gt=0)
+    source: Optional[IncomeSource] = None
+    description: Optional[str] = None
+    transaction_date: Optional[date] = None
+
+
 class IncomeResponse(BaseModel):
     id: str
     wallet_id: str
@@ -62,6 +69,13 @@ class ExpenseCreate(BaseModel):
     category: ExpenseCategory
     description: Optional[str] = None
     transaction_date: date = Field(default_factory=date.today)
+
+
+class ExpenseUpdate(BaseModel):
+    amount: Optional[float] = Field(None, gt=0)
+    category: Optional[ExpenseCategory] = None
+    description: Optional[str] = None
+    transaction_date: Optional[date] = None
 
 
 class ExpenseResponse(BaseModel):

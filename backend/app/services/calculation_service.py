@@ -57,7 +57,6 @@ class CalculationService:
         prev_month = 12 if month == 1 else month - 1
         prev_year = year - 1 if month == 1 else year
 
-        # Recursively or iteratively ensure previous ledger exists to roll forward balance
         prev_stmt = select(MonthlyLedger).where(
             and_(
                 MonthlyLedger.wallet_id == wallet_id,
@@ -70,7 +69,6 @@ class CalculationService:
 
         opening_balance = 0.0
         if prev_ledger:
-            # Closing balance of prev month = prev_opening + prev_income - prev_expense
             prev_inc = await CalculationService.get_total_income(db, wallet_id, prev_year, prev_month)
             prev_exp = await CalculationService.get_total_expense(db, wallet_id, prev_year, prev_month)
             opening_balance = float(prev_ledger.opening_balance) + prev_inc - prev_exp
@@ -88,6 +86,25 @@ class CalculationService:
         return new_ledger
 
     @staticmethod
+    async def roll_forward_ledger(db: AsyncSession, wallet_id: str, target_year: int, target_month: int) -> Dict[str, Any]:
+        prev_month = 12 if target_month == 1 else target_month - 1
+        prev_year = target_year - 1 if target_month == 1 else target_year
+
+        # Get or create previous month ledger to calculate its closing balance
+        prev_ledger = await CalculationService.get_or_create_monthly_ledger(db, wallet_id, prev_year, prev_month)
+        prev_inc = await CalculationService.get_total_income(db, wallet_id, prev_year, prev_month)
+        prev_exp = await CalculationService.get_total_expense(db, wallet_id, prev_year, prev_month)
+        closing_balance = float(prev_ledger.opening_balance) + prev_inc - prev_exp
+
+        # Update target month's opening balance
+        target_ledger = await CalculationService.get_or_create_monthly_ledger(db, wallet_id, target_year, target_month)
+        target_ledger.opening_balance = closing_balance
+        await db.commit()
+        await db.refresh(target_ledger)
+
+        return await CalculationService.calculate_wallet_summary(db, wallet_id, target_year, target_month)
+
+    @staticmethod
     async def calculate_wallet_summary(db: AsyncSession, wallet_id: str, year: int, month: int) -> Dict[str, Any]:
         ledger = await CalculationService.get_or_create_monthly_ledger(db, wallet_id, year, month)
         opening_balance = float(ledger.opening_balance)
@@ -99,7 +116,6 @@ class CalculationService:
         savings = closing_balance
         savings_rate = (savings / income * 100) if income > 0 else 0.0
 
-        # Number of days in month or days elapsed
         today = date.today()
         if today.year == year and today.month == month:
             days = today.day
@@ -108,7 +124,6 @@ class CalculationService:
         
         avg_daily_expense = (expense / days) if days > 0 else 0.0
 
-        # Fetch all users (strictly 2)
         users_result = await db.execute(select(User))
         users = users_result.scalars().all()
         

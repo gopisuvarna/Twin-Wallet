@@ -63,7 +63,7 @@ class Income(Base):
     wallet_id: Mapped[str] = mapped_column(String(36), ForeignKey("wallets.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    source: Mapped[str] = mapped_column(String(50), nullable=False)  # Salary, Bonus, Gift, Freelancing, Business, Investment, Cashback, Other
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -82,7 +82,7 @@ class Expense(Base):
     wallet_id: Mapped[str] = mapped_column(String(36), ForeignKey("wallets.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
-    category: Mapped[str] = mapped_column(String(50), nullable=False)  # Food, Shopping, Travel, Rent, Fuel, Bills, etc.
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -96,12 +96,14 @@ class Budget(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     wallet_id: Mapped[str] = mapped_column(String(36), ForeignKey("wallets.id", ondelete="CASCADE"), nullable=False)
-    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Null means overall monthly budget
+    user_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     amount_limit: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     month: Mapped[int] = mapped_column(Integer, nullable=False)
 
     wallet: Mapped["Wallet"] = relationship("Wallet", back_populates="budgets")
+    user: Mapped[Optional["User"]] = relationship("User")
 
 
 class SavingsGoal(Base):

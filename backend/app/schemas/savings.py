@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -22,3 +22,20 @@ class SavingsGoalResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PartnerSavingsItem(BaseModel):
+    user_id: str
+    user_name: str
+    monthly_income: float
+    monthly_expense: float
+    monthly_savings: float
+    lifetime_savings: float
+
+
+class SavingsOverviewResponse(BaseModel):
+    year: int
+    month: int
+    combined_monthly_savings: float
+    combined_lifetime_savings: float
+    partner_savings: List[PartnerSavingsItem]

@@ -1,25 +1,32 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { formatINR } from '../../utils/currency';
 import { darkColors, lightColors } from '../../theme/colors';
 
 interface BudgetCardProps {
+  id: string;
   category?: string | null;
+  userName?: string | null;
   amountLimit: number;
   spentAmount: number;
   remainingAmount: number;
   percentageUsed: number;
   isExceeded: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
   isDarkMode?: boolean;
 }
 
 export const BudgetCard: React.FC<BudgetCardProps> = ({
   category,
+  userName,
   amountLimit,
   spentAmount,
   remainingAmount,
   percentageUsed,
   isExceeded,
+  onEdit,
+  onDelete,
   isDarkMode = true,
 }) => {
   const colors = isDarkMode ? darkColors : lightColors;
@@ -30,13 +37,34 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({
     ? '#F59E0B'
     : colors.primary;
 
+  const handleDeletePress = () => {
+    Alert.alert(
+      'Delete Budget',
+      `Delete budget limit for ${category || 'Overall'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: onDelete },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.categoryTitle, { color: colors.textPrimary }]}>
-            {category || 'Overall Monthly Budget'}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={[styles.categoryTitle, { color: colors.textPrimary }]}>
+              {category || 'Overall Budget'}
+            </Text>
+
+            {/* Scope Badge (Joint vs Individual) */}
+            <View style={[styles.scopeBadge, { backgroundColor: userName ? colors.incomeBg : colors.surfaceVariant }]}>
+              <Text style={[styles.scopeText, { color: userName ? colors.income : colors.textSecondary }]}>
+                {userName ? `👤 ${userName}` : '👥 Joint Wallet'}
+              </Text>
+            </View>
+          </View>
+
           <Text style={[styles.subText, { color: colors.textSecondary }]}>
             Spent {formatINR(spentAmount)} of {formatINR(amountLimit)}
           </Text>
@@ -67,6 +95,20 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({
         <Text style={[styles.pctText, { color: colors.textMuted }]}>
           {percentageUsed.toFixed(1)}% Used
         </Text>
+
+        <View style={styles.actionRow}>
+          {onEdit ? (
+            <TouchableOpacity onPress={onEdit} style={styles.actionBtn}>
+              <Text style={styles.actionIcon}>✏️ Edit</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {onDelete ? (
+            <TouchableOpacity onPress={handleDeletePress} style={styles.actionBtn}>
+              <Text style={styles.actionIcon}>🗑️ Delete</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -82,16 +124,31 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  titleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   categoryTitle: {
     fontSize: 16,
     fontWeight: '700',
   },
+  scopeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  scopeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
   subText: {
     fontSize: 12,
-    marginTop: 2,
+    marginTop: 4,
   },
   badge: {
     paddingHorizontal: 8,
@@ -118,11 +175,23 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 6,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
   },
   pctText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionBtn: {
+    paddingVertical: 2,
+  },
+  actionIcon: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
