@@ -69,10 +69,24 @@ async def test_full_twin_wallet_lifecycle_integration(client):
     assert summary["savings"] == 35000.0
     assert summary["savings_rate"] == 43.75
 
-    # Check partner names are explicitly preserved
-    partner_names = [p["user_name"] for p in summary["partner_contributions"]]
-    assert "Venkata Sai Gopi" in partner_names
-    assert "Ananya" in partner_names
+    # Step 6b: Verify Dashboard Analytics & Partner Category Breakdown
+    analytics_res = await client.get("/api/v1/analytics/dashboard?year=2026&month=7", headers=gopi_headers)
+    assert analytics_res.status_code == 200
+    analytics_data = analytics_res.json()
+    assert "partner_analytics" in analytics_data
+    assert len(analytics_data["partner_analytics"]) == 2
+
+    # Verify each partner has their individual category breakdown list present
+    for partner in analytics_data["partner_analytics"]:
+        assert "category_breakdown" in partner
+        if partner["user_name"] == "Ananya":
+            assert len(partner["category_breakdown"]) == 1
+            assert partner["category_breakdown"][0]["category"] == "Rent"
+            assert partner["category_breakdown"][0]["amount"] == 30000.0
+        elif partner["user_name"] == "Venkata Sai Gopi":
+            assert len(partner["category_breakdown"]) == 1
+            assert partner["category_breakdown"][0]["category"] == "Food"
+            assert partner["category_breakdown"][0]["amount"] == 15000.0
 
     # Step 7: Verify PDF Report Generation
     pdf_res = await client.get("/api/v1/reports/pdf?year=2026&month=7", headers=gopi_headers)

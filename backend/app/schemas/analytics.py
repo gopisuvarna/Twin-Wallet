@@ -20,6 +20,7 @@ class PartnerAnalyticsItem(BaseModel):
     income: float
     expense: float
     savings_contribution: float
+    category_breakdown: List[CategoryBreakdownItem] = []
 
 
 class MonthlyComparisonItem(BaseModel):
