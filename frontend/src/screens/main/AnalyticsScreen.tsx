@@ -37,7 +37,7 @@ export const AnalyticsScreen = () => {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>Financial Analytics</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Category-wise spending pie charts per person & joint
+        Individual partner expense charts & joint summary
       </Text>
 
       {/* Month Navigation Header */}
